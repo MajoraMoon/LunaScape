@@ -2,12 +2,12 @@ cmake_minimum_required(VERSION 3.15)
 
 project(LunaScape)
 
-set(CMAKE_CXX_COMPILER g++)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_OBJCXX_STANDARD_REQUIRED True)
+set(CMAKE_C_COMPILER gcc)
+set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD_REQUIRED True)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
-file(GLOB_RECURSE SOURCES "src/*.cpp")
+file(GLOB_RECURSE SOURCES "src/*.c")
 
 
 add_executable(LunaScape ${SOURCES})
