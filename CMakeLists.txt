@@ -12,7 +12,7 @@ file(GLOB_RECURSE SOURCES "src/*.c")
 
 add_executable(LunaScape ${SOURCES})
 
-target_include_directories(LunaScape PRIVATE ${CMAKE_SOURCE_DIR}/inlcude)
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 find_package(SDL3 REQUIRED)
 target_link_libraries(LunaScape PRIVATE SDL3::SDL3)
