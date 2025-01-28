@@ -2,15 +2,17 @@
 
 SDL_Window *initWayWindow(const char *title, const char *version, unsigned int width, unsigned int height, bool resizableWindow)
 {
+    // Metadata is new in SDL3, why not using it :)
     SDL_SetAppMetadata(title, version, NULL);
 
-    if (!SDL_Init(SDL_INIT_VIDEO))
+    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
     {
         SDL_Log("Couldn't initialize SDL: %s", SDL_GetError());
 
         return NULL;
     }
 
+    // instead of creating a window with properties directly, using the more modular approach here.
     SDL_PropertiesID props = SDL_CreateProperties();
     if (props == 0)
     {
