@@ -25,8 +25,9 @@ SDL_Window *initWayWindow(const char *title, const char *version, unsigned int w
     SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, resizableWindow);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
     SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
-    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN, true);
 
+    // later implementating a different wayland window session. If activated now, no window will be displayed.
+    //  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN, true);
     SDL_Window *window = SDL_CreateWindowWithProperties(props);
 
     if (window == NULL)
