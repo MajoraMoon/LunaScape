@@ -116,6 +116,7 @@ VideoPlayer *init_video_player(const char *filepath);
 void free_video_player(VideoPlayer *player);
 
 vFrame *init_video_frames(VideoPlayer *player);
+
 void free_video_frames(vFrame *videoFrame);
 
 int video_player_get_frame(VideoPlayer *player, vFrame *videoFrame);

@@ -1,5 +1,6 @@
 #include <renderer.h>
 
+// vWidth and vHeight are the dimensions of the Video (from VideoPlayer)
 Renderer *init_renderer(SDL_Window *window, int vWidth, int vHeight) {
 
   Renderer *renderer = (Renderer *)malloc(sizeof(Renderer));

@@ -66,6 +66,14 @@ VideoPlayer *init_video_player(const char *filepath) {
       player->pCodecCtx,
       player->pFormatCtx->streams[player->videoStreamIndex]->codecpar);
 
+  /**
+   * testing this later:
+   *   player->pCodecCtx->thread_count = 4; //
+    player->pCodecCtx->thread_type =
+        FF_THREAD_FRAME;
+   *
+   */
+
   if (avcodec_open2(player->pCodecCtx, player->pCodec, NULL) < 0) {
     printf("Could not open Codec.\n");
     avcodec_free_context(&player->pCodecCtx);
@@ -113,26 +121,43 @@ vFrame *init_video_frames(VideoPlayer *player) {
 
 int video_player_get_frame(VideoPlayer *player, vFrame *videoFrame) {
 
-  if (av_read_frame(player->pFormatCtx, videoFrame->packet) < 0) {
-    return 0;
-  }
+  while (av_read_frame(player->pFormatCtx, videoFrame->packet) >= 0) {
 
-  if (videoFrame->packet->stream_index == player->videoStreamIndex) {
-    if (avcodec_send_packet(player->pCodecCtx, videoFrame->packet) == 0) {
-      if (avcodec_receive_frame(player->pCodecCtx, videoFrame->frame) == 0) {
+    if (videoFrame->packet->stream_index == player->videoStreamIndex) {
 
+      int send_status =
+          avcodec_send_packet(player->pCodecCtx, videoFrame->packet);
+      if (send_status < 0) {
+        printf("Error sending packet: %d\n", send_status);
+        av_packet_unref(videoFrame->packet);
+        continue; // try with the next package.
+      }
+
+      int receive_status =
+          avcodec_receive_frame(player->pCodecCtx, videoFrame->frame);
+      if (receive_status == 0) { // if successfully received frames
         sws_scale(player->sws_ctx,
                   (const uint8_t *const *)videoFrame->frame->data,
                   videoFrame->frame->linesize, 0, player->pCodecCtx->height,
                   videoFrame->frameYUV->data, videoFrame->frameYUV->linesize);
 
         av_packet_unref(videoFrame->packet);
-        return 1;
+        return 1; // successfully decoded frame/frames
+      } else if (receive_status == AVERROR(EAGAIN)) {
+        printf("Decoder needs more data...\n");
+        av_packet_unref(videoFrame->packet);
+        continue; // wait for more data to decode
+      } else {
+        printf("Error receiving frame: %d\n", receive_status);
+        av_packet_unref(videoFrame->packet);
+        return 0; // something really baaaadd happened receiving frames.
       }
     }
+
+    av_packet_unref(videoFrame->packet);
   }
-  av_packet_unref(videoFrame->packet);
-  return 0;
+
+  return 0; // Keine weiteren Pakete -> Video zu Ende
 }
 
 void free_video_player(VideoPlayer *player) {

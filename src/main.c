@@ -1,106 +1,40 @@
-
-#include <libavcodec/avcodec.h>
-#include <libavformat/avformat.h>
-#include <libavutil/imgutils.h>
-#include <libswscale/swscale.h>
-
+#include <renderer.h>
+#include <video_player.h>
 #include <wayWindow.h>
 
 #define VIDEO_FILE "../video.mp4"
 
 int main(int argc, char *argv[]) {
 
-  AVFormatContext *pFormatCtx = NULL;
-  AVCodecContext *pCodecCtx = NULL;
-  const AVCodec *pCodec = NULL;
-  int videoStreamIndex = -1;
+  VideoPlayer *videoPlayer = init_video_player(VIDEO_FILE);
 
-  if (avformat_open_input(&pFormatCtx, VIDEO_FILE, NULL, NULL) != 0) {
-    printf("Could not open Videofile.\n");
-
+  if (!videoPlayer) {
+    SDL_Log("Something went wrong in setting up the Video player.\n");
     return -1;
   }
 
-  // find the stream information (I know these comments are amazing useful)
-  if (avformat_find_stream_info(pFormatCtx, NULL) < 0) {
-    printf("Could not find any stream-information.\n");
+  SDL_Window *window = initWayWindow("LunaScape", "0.1", 1920, 1080, true);
 
-    return -1;
-  }
-
-  // iterates through all streams and sets the video StreamIndex to the first
-  // video stream found
-  for (int i = 0; i < pFormatCtx->nb_streams; i++) {
-    if (pFormatCtx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-      videoStreamIndex = i;
-      break;
-    }
-  }
-
-  if (videoStreamIndex == -1) {
-    printf("No video-stream found.\n");
-
-    return -1;
-  }
-
-  // finds the right decoder of the video. ffmpeg supports extremly many codecs
-  // see: "ffmpeg -codecs"
-  pCodec = avcodec_find_decoder(
-      pFormatCtx->streams[videoStreamIndex]->codecpar->codec_id);
-
-  if (pCodec == NULL) {
-    printf("Could not find a fitting Codec.\n");
-
-    return -1;
-  }
-
-  // creates an empty codec and fills it with information.
-  pCodecCtx = avcodec_alloc_context3(pCodec);
-  avcodec_parameters_to_context(
-      pCodecCtx, pFormatCtx->streams[videoStreamIndex]->codecpar);
-
-  if (avcodec_open2(pCodecCtx, pCodec, NULL) < 0) {
-    printf("Could not open Codec.\n");
-
-    return -1;
-  }
-
-  SDL_Window *window = initWayWindow("LunaScape", "0.1", 1280, 720, true);
-
-  if (window == NULL) {
+  if (!window) {
     SDL_Log("Something went wrong in setting up a SDL window.\n");
-  }
-
-  SDL_Renderer *renderer = SDL_CreateRenderer(window, NULL);
-  if (!renderer) {
-    SDL_Log("Unable to create renderer %s\n", SDL_GetError());
     return -1;
   }
 
-  SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_YV12,
-                                           SDL_TEXTUREACCESS_STREAMING,
-                                           pCodecCtx->width, pCodecCtx->height);
+  Renderer *renderer = init_renderer(window, videoPlayer->pCodecCtx->width,
+                                     videoPlayer->pCodecCtx->height);
 
-  // SDL texture and ffmpeg information configuration
+  if (!renderer) {
+    SDL_Log("Something went wrong in setting up the renderer.\n");
+    return -1;
+  }
 
-  AVPacket *packet = av_packet_alloc();
-  AVFrame *frame = av_frame_alloc();
-  AVFrame *frameYUV = av_frame_alloc();
+  vFrame *videoFrame = init_video_frames(videoPlayer);
 
-  // reserves memory for the YUV-images and fills framYUV with the necessary
-  // data
-  int numBytes = av_image_get_buffer_size(AV_PIX_FMT_YUV420P, pCodecCtx->width,
-                                          pCodecCtx->height, 32);
-  uint8_t *buffer = (uint8_t *)av_malloc(numBytes * sizeof(uint8_t));
-
-  av_image_fill_arrays(frameYUV->data, frameYUV->linesize, buffer,
-                       AV_PIX_FMT_YUV420P, pCodecCtx->width, pCodecCtx->height,
-                       32);
-
-  // creates a swsContext for converting RGB data to YUV420P data
-  struct SwsContext *sws_ctx = sws_getContext(
-      pCodecCtx->width, pCodecCtx->height, pCodecCtx->pix_fmt, pCodecCtx->width,
-      pCodecCtx->height, AV_PIX_FMT_YUV420P, SWS_BILINEAR, NULL, NULL, NULL);
+  if (!videoFrame) {
+    SDL_Log(
+        "Something went wrong in setting up the Frame rendering process.\n");
+    return -1;
+  }
 
   bool running = true;
   while (running) {
@@ -115,44 +49,17 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    // reads a single frame
-    if (av_read_frame(pFormatCtx, packet) >= 0) {
-      if (packet->stream_index == videoStreamIndex) {
-        if (avcodec_send_packet(pCodecCtx, packet) == 0) {
-          while (avcodec_receive_frame(pCodecCtx, frame) == 0) {
-            // Converts a frame into the YUV format
-            sws_scale(sws_ctx, (const uint8_t *const *)frame->data,
-                      frame->linesize, 0, pCodecCtx->height, frameYUV->data,
-                      frameYUV->linesize);
-
-            // Copy a frame into a SDL texture
-            SDL_UpdateYUVTexture(texture, NULL, frameYUV->data[0],
-                                 frameYUV->linesize[0], frameYUV->data[1],
-                                 frameYUV->linesize[1], frameYUV->data[2],
-                                 frameYUV->linesize[2]);
-
-            SDL_RenderClear(renderer);
-            SDL_RenderTexture(renderer, texture, NULL, NULL);
-            SDL_RenderPresent(renderer);
-          }
-        }
-      }
-      av_packet_unref(packet);
+    if (video_player_get_frame(videoPlayer, videoFrame)) {
+      renderer_render_frames(renderer, videoFrame);
     } else {
-      running = false;
+      av_seek_frame(videoPlayer->pFormatCtx, -1, 0, AVSEEK_FLAG_BACKWARD);
+      avcodec_flush_buffers(videoPlayer->pCodecCtx);
     }
   }
 
-  av_frame_free(&frame);
-  av_frame_free(&frameYUV);
-  av_packet_free(&packet);
-  sws_freeContext(sws_ctx);
-  SDL_DestroyTexture(texture);
-  SDL_DestroyRenderer(renderer);
-  SDL_DestroyWindow(window);
-  avcodec_free_context(&pCodecCtx);
-  avformat_close_input(&pFormatCtx);
-
+  free_video_player(videoPlayer);
+  free_video_frames(videoFrame);
+  free_renderer(renderer);
   cleanupWindow(window);
 
   return 0;
