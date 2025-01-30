@@ -21,6 +21,8 @@ SDL_Window *initWayWindow(const char *title, const char *version,
     return NULL;
   }
 
+  // set pCodecCtx->width and pCodecCtx->height for opening the window with the
+  // dimensions of the videofile
   SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title);
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN,
                          resizableWindow);

@@ -1,6 +1,8 @@
 #include <video_player.h>
 
 VideoPlayer *init_video_player(const char *filepath) {
+
+  // careful, heap! free the memory later.
   VideoPlayer *player = (VideoPlayer *)malloc(sizeof(VideoPlayer));
   if (!player) {
     printf("Video player - Memory allocation error.\n");
@@ -94,6 +96,8 @@ vFrame *init_video_frames(VideoPlayer *player) {
   videoFrame->frameYUV = av_frame_alloc();
   videoFrame->packet = av_packet_alloc();
 
+  // reserves memory for the YUV-images and fills framYUV with the necessary
+  // data
   int numBytes =
       av_image_get_buffer_size(AV_PIX_FMT_YUV420P, player->pCodecCtx->width,
                                player->pCodecCtx->height, 32);
