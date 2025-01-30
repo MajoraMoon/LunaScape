@@ -37,6 +37,7 @@ int main(int argc, char *argv[]) {
   }
 
   bool running = true;
+  Uint32 last_frame_time = SDL_GetTicks();
   while (running) {
     SDL_Event event;
 
@@ -49,11 +50,21 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    if (video_player_get_frame(videoPlayer, videoFrame)) {
-      renderer_render_frames(renderer, videoFrame);
+    Uint32 current_time = SDL_GetTicks();
+    Uint32 elapsed_time = current_time - last_frame_time;
+
+    if (elapsed_time >=
+        videoPlayer->frame_time) { // Nur rendern, wenn genug Zeit vergangen ist
+      if (video_player_get_frame(videoPlayer, videoFrame)) {
+        renderer_render_frames(renderer, videoFrame);
+      } else {
+        av_seek_frame(videoPlayer->pFormatCtx, -1, 0, AVSEEK_FLAG_BACKWARD);
+        avcodec_flush_buffers(videoPlayer->pCodecCtx);
+      }
+      last_frame_time = SDL_GetTicks(); // Zeit für nächstes Frame speichern
     } else {
-      av_seek_frame(videoPlayer->pFormatCtx, -1, 0, AVSEEK_FLAG_BACKWARD);
-      avcodec_flush_buffers(videoPlayer->pCodecCtx);
+      SDL_Delay(videoPlayer->frame_time -
+                elapsed_time); // Warten, falls das Frame zu schnell ist
     }
   }
 

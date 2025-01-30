@@ -92,6 +92,7 @@ typedef struct VideoPlayer {
   const AVCodec *pCodec;
   int videoStreamIndex;
   struct SwsContext *sws_ctx;
+  double frame_time;
 
 } VideoPlayer;
 
