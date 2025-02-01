@@ -2,7 +2,7 @@
 #include <video_player.h>
 #include <wayWindow.h>
 
-#define VIDEO_FILE "../video.mp4"
+#define VIDEO_FILE "../test.mp4"
 
 int main(int argc, char *argv[]) {
 
@@ -37,7 +37,11 @@ int main(int argc, char *argv[]) {
   }
 
   bool running = true;
-  Uint32 last_frame_time = SDL_GetTicks();
+  printf("Frame Konvertierung: %d x %d -> %d x %d\n",
+         videoPlayer->pCodecCtx->width, videoPlayer->pCodecCtx->height,
+         videoPlayer->pCodecCtx->width, videoPlayer->pCodecCtx->height);
+
+  uint32_t start_time = SDL_GetTicks();
   while (running) {
     SDL_Event event;
 
@@ -50,21 +54,26 @@ int main(int argc, char *argv[]) {
       }
     }
 
-    Uint32 current_time = SDL_GetTicks();
-    Uint32 elapsed_time = current_time - last_frame_time;
+    uint32_t current_time = SDL_GetTicks() - start_time;
+    double current_time_sec = current_time / 1000.0;
 
-    if (elapsed_time >=
-        videoPlayer->frame_time) { // Nur rendern, wenn genug Zeit vergangen ist
-      if (video_player_get_frame(videoPlayer, videoFrame)) {
-        renderer_render_frames(renderer, videoFrame);
-      } else {
-        av_seek_frame(videoPlayer->pFormatCtx, -1, 0, AVSEEK_FLAG_BACKWARD);
-        avcodec_flush_buffers(videoPlayer->pCodecCtx);
+    if (video_player_get_frame(videoPlayer, videoFrame)) {
+
+      int64_t pts = videoFrame->frame->pts;
+      double timestamp =
+          pts *
+          av_q2d(videoPlayer->pFormatCtx->streams[videoPlayer->videoStreamIndex]
+                     ->time_base);
+
+      if (timestamp > current_time_sec) {
+        uint32_t wait_time = (timestamp - current_time_sec) * 1000; // in ms
+        SDL_Delay(wait_time);
       }
-      last_frame_time = SDL_GetTicks(); // Zeit für nächstes Frame speichern
+
+      renderer_render_frames(renderer, videoFrame);
     } else {
-      SDL_Delay(videoPlayer->frame_time -
-                elapsed_time); // Warten, falls das Frame zu schnell ist
+      av_seek_frame(videoPlayer->pFormatCtx, -1, 0, AVSEEK_FLAG_BACKWARD);
+      avcodec_flush_buffers(videoPlayer->pCodecCtx);
     }
   }
 

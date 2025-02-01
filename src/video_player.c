@@ -46,11 +46,6 @@ VideoPlayer *init_video_player(const char *filepath) {
     return NULL;
   }
 
-  double fps = av_q2d(
-      player->pFormatCtx->streams[player->videoStreamIndex]->avg_frame_rate);
-
-  player->frame_time = 1000.0 / fps;
-
   // finds the right decoder of the video. ffmpeg supports extremly many codecs
   // see: "ffmpeg -codecs"
   player->pCodec =
@@ -92,7 +87,7 @@ VideoPlayer *init_video_player(const char *filepath) {
       sws_getContext(player->pCodecCtx->width, player->pCodecCtx->height,
                      player->pCodecCtx->pix_fmt, player->pCodecCtx->width,
                      player->pCodecCtx->height, AV_PIX_FMT_YUV420P,
-                     SWS_BILINEAR, NULL, NULL, NULL);
+                     SWS_FAST_BILINEAR, NULL, NULL, NULL);
 
   return player;
 }
