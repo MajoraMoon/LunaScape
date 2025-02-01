@@ -14,8 +14,10 @@ add_executable(LunaScape ${SOURCES})
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
+# When I'm using "SDL3::SDL3" for target_link_libraries, 
+# I get an undefined reference to `SDL_WaitAndAcquireGPUSwapchainTexture'.
 find_package(SDL3 REQUIRED)
-target_link_libraries(LunaScape PRIVATE SDL3::SDL3)
+target_link_libraries(LunaScape PRIVATE /usr/lib/libSDL3.so)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale libswresample)
