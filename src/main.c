@@ -69,6 +69,8 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  SDL_Log("%s", SDL_GetGPUDriver(0));
+
   int quit = false;
 
   // main loop - keyevents and rendering
