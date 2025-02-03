@@ -13,11 +13,17 @@ file(GLOB_RECURSE SOURCES "src/*.c")
 add_executable(LunaScape ${SOURCES})
 
 include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(/usr/local/include/SDL3_image)
+
 
 # When I'm using "SDL3::SDL3" for target_link_libraries, 
 # I get an undefined reference to `SDL_WaitAndAcquireGPUSwapchainTexture'.
+# Arch repos are not that fast, SDL3_image is not ther yet lol so did it manually
 find_package(SDL3 REQUIRED)
 target_link_libraries(LunaScape PRIVATE /usr/lib/libSDL3.so)
+target_link_libraries(LunaScape PRIVATE /usr/local/lib/libSDL3_image.so)
+
+
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(FFMPEG REQUIRED libavcodec libavformat libavutil libswscale libswresample)
