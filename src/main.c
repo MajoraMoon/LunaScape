@@ -21,6 +21,7 @@ SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *shaderFile,
   // stage of the shader. So is it a vertex or fragment shader?
   SDL_GPUShaderStage stage;
 
+  // The shaders should have a ".vert" or ".frag" in their filenames.
   if (SDL_strstr(shaderFile, ".vert")) {
     stage = SDL_GPU_SHADERSTAGE_VERTEX;
   } else if (SDL_strstr(shaderFile, ".frag")) {
@@ -30,12 +31,14 @@ SDL_GPUShader *LoadShader(SDL_GPUDevice *device, const char *shaderFile,
     return NULL;
   }
 
+  // compiled vulcan shader used
   SDL_GPUShaderFormat format = SDL_GPU_SHADERFORMAT_SPIRV;
   const char *entrypoint = "main";
   char fullPath[256];
   SDL_snprintf(fullPath, sizeof(fullPath), "../shader/compiled/%s.spv",
                shaderFile);
 
+  // load actual shader file
   size_t codeSize;
   void *code = SDL_LoadFile(fullPath, &codeSize);
   if (code == NULL) {
@@ -129,7 +132,7 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  // Create Shaders
+  // Create vertex Shaders
   SDL_GPUShader *vertexShader =
       LoadShader(wayWindow.GPUDevice, "PositionColor.vert", 0, 0, 0, 0);
 
@@ -137,7 +140,7 @@ int main(int argc, char *argv[]) {
     SDL_Log("Failed to create vertex shader!");
     return -1;
   }
-
+  // Create fragment Shaders
   SDL_GPUShader *fragmentShader =
       LoadShader(wayWindow.GPUDevice, "SolidColor.frag", 0, 0, 0, 0);
   if (fragmentShader == NULL) {
