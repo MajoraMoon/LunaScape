@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
 project(LunaScape)
-
+set(CMAKE_BUILD_TYPE Debug)
 set(CMAKE_C_COMPILER gcc)
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_C_STANDARD_REQUIRED True)

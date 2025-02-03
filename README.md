@@ -1,3 +1,3 @@
-SDL3 - ffmpeg - vulcan verion. 
+SDL3 - ffmpeg - nevemind -openGL. 
 
 On Wayland/Plasma 6
