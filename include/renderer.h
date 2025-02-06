@@ -38,6 +38,8 @@ void renderFrame(Renderer *renderer, unsigned int srcWidth,
 void renderFrameWithPBO(Renderer *renderer, unsigned int srcWidth,
                         unsigned int srcHeight, vFrame *videoFrame);
 
+void renderFrameWithoutUpdate(Renderer *renderer);
+
 // update tranform matrix to hold the right aspect ratio of the video
 void updateVideoTranformation(Renderer *renderer, int windowWidth,
                               int windowHeight, int videoWidth,

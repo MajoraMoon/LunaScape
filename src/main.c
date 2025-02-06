@@ -44,7 +44,15 @@ int main(int argc, char *argv[]) {
   initRenderer(&renderer, video->pCodecCtx->width, video->pCodecCtx->height);
 
   bool running = true;
+
   uint64_t start_time = SDL_GetTicksNS();
+  uint64_t pauseStart = 0;
+
+  // press "F" for activating Fullscreen
+  bool isFullscreen = false;
+
+  // press "Space" for pausing the video
+  video->paused = false;
 
   // main render loop
   while (running) {
@@ -60,6 +68,26 @@ int main(int argc, char *argv[]) {
         if (event.key.key == SDLK_ESCAPE) {
           running = false;
         }
+
+        if (event.key.key == SDLK_F) {
+          isFullscreen = !isFullscreen;
+          if (isFullscreen) {
+            SDL_SetWindowFullscreen(window, true);
+          } else {
+            SDL_SetWindowFullscreen(window, false);
+          }
+        }
+
+        if (event.key.key == SDLK_SPACE) {
+          if (!video->paused) {
+            pauseStart = SDL_GetTicksNS();
+            video->paused = true;
+          } else {
+            uint64_t pauseDuration = SDL_GetTicksNS() - pauseStart;
+            start_time += pauseDuration;
+            video->paused = false;
+          }
+        }
       }
     }
 
@@ -70,30 +98,38 @@ int main(int argc, char *argv[]) {
                              video->pCodecCtx->width, video->pCodecCtx->height);
 
     // Sync the render loops framerate with the one from the given Video
-    if (video_container_get_frame(video, videoFrame)) {
-      int64_t pts = videoFrame->frame->pts;
-      double timestamp =
-          pts *
-          av_q2d(
-              video->pFormatCtx->streams[video->videoStreamIndex]->time_base);
 
-      double current_time_sec = (double)(SDL_GetTicksNS() - start_time) / 1e9;
-      double wait_time = timestamp - current_time_sec;
+    if (!video->paused) {
+      if (video_container_get_frame(video, videoFrame)) {
+        int64_t pts = videoFrame->frame->pts;
+        double timestamp =
+            pts *
+            av_q2d(
+                video->pFormatCtx->streams[video->videoStreamIndex]->time_base);
 
-      if (wait_time >
-          0.001) { // Only delays when the time difference is bigger than 1ms
-        SDL_Delay((uint32_t)(wait_time * 1000));
+        double current_time_sec = (double)(SDL_GetTicksNS() - start_time) / 1e9;
+        double wait_time = timestamp - current_time_sec;
+
+        if (wait_time >
+            0.001) { // Only delays when the time difference is bigger than 1ms
+          SDL_Delay((uint32_t)(wait_time * 1000));
+        }
+
+        // On my sytem, the frame render time is going down from 5ms to 2ms when
+        // using pixel buffer objects.
+        renderFrameWithPBO(&renderer, video->pCodecCtx->width,
+                           video->pCodecCtx->height, videoFrame);
+      } else {
+        // When no frames avaiable anymore, start the video from the beginning
+        av_seek_frame(video->pFormatCtx, video->videoStreamIndex, 0,
+                      AVSEEK_FLAG_BACKWARD);
+        avcodec_flush_buffers(video->pCodecCtx);
       }
-
-      // On my sytem, the frame render time is going down from 5ms to 2ms when
-      // using pixel buffer objects.
-      renderFrameWithPBO(&renderer, video->pCodecCtx->width,
-                         video->pCodecCtx->height, videoFrame);
     } else {
-      // When no frames avaiable anymore, start the video from the beginning
-      av_seek_frame(video->pFormatCtx, video->videoStreamIndex, 0,
-                    AVSEEK_FLAG_BACKWARD);
-      avcodec_flush_buffers(video->pCodecCtx);
+
+      renderFrameWithoutUpdate(&renderer);
+
+      SDL_Delay(200);
     }
 
     SDL_GL_SwapWindow(window);

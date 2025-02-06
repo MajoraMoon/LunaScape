@@ -114,8 +114,11 @@ vFrame *init_video_frames(VideoContainer *video) {
 
 int video_container_get_frame(VideoContainer *video, vFrame *videoFrame) {
 
-  while (av_read_frame(video->pFormatCtx, videoFrame->packet) >= 0) {
+  while (video->paused) {
+    SDL_Delay(10);
+  }
 
+  while (av_read_frame(video->pFormatCtx, videoFrame->packet) >= 0) {
     if (videoFrame->packet->stream_index == video->videoStreamIndex) {
 
       int send_status =

@@ -125,6 +125,12 @@ void renderFrameWithPBO(Renderer *renderer, unsigned int srcWidth,
   // switch PBO'S to use.
   renderer->pboIndex = nextPboIndex;
 }
+void renderFrameWithoutUpdate(Renderer *renderer) {
+
+  useShader(&renderer->shader);
+  glBindVertexArray(renderer->vao);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
 
 void updateVideoTranformation(Renderer *renderer, int windowWidth,
                               int windowHeight, int videoWidth,

@@ -1,6 +1,7 @@
 #ifndef MEDIA_LOADER_H
 #define MEDIA_LOADER_H
 
+#include <SDL3/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -92,6 +93,7 @@ typedef struct VideoContainer {
   AVCodecContext *pCodecCtx;
   const AVCodec *pCodec;
   int videoStreamIndex;
+  bool paused;
   struct SwsContext *sws_ctx;
 
 } VideoContainer;
