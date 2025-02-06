@@ -1,6 +1,6 @@
 #include <main.h>
 
-#define VIDEO_FILE "../video.mp4"
+#define VIDEO_FILE "../test2.mkv"
 
 // window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
@@ -85,9 +85,10 @@ int main(int argc, char *argv[]) {
         SDL_Delay((uint32_t)(wait_time * 1000));
       }
 
-      // Render mit OpenGL:
-      renderFrame(&renderer, video->pCodecCtx->width, video->pCodecCtx->height,
-                  videoFrame);
+      // On my sytem, the frame render time is going down from 5ms to 2ms when
+      // using pixel buffer objects.
+      renderFrameWithPBO(&renderer, video->pCodecCtx->width,
+                         video->pCodecCtx->height, videoFrame);
     } else {
       // When no frames avaiable anymore, start the video from the beginning
       av_seek_frame(video->pFormatCtx, video->videoStreamIndex, 0,

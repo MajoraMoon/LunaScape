@@ -22,6 +22,18 @@ void initRenderer(Renderer *renderer, int texWidth, int texHeight) {
   glGenVertexArrays(1, &renderer->vao);
   glGenBuffers(1, &renderer->vbo);
   glGenBuffers(1, &renderer->ebo);
+  glGenQueries(1, &renderer->queryID);
+
+  glGenBuffers(2, renderer->pbo);
+  for (int i = 0; i < 2; i++) {
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, renderer->pbo[i]);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, texWidth * texHeight * 3, NULL,
+                 GL_STREAM_DRAW); // 3 because of RGB Values
+  }
+
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+
+  renderer->pboIndex = 0;
 
   // activates the vao, everything below will be referenced to this vao
   glBindVertexArray(renderer->vao);
@@ -63,6 +75,7 @@ void initRenderer(Renderer *renderer, int texWidth, int texHeight) {
                                   "../shader/fragmentShader.frag");
 }
 
+// renders a texture-frame in sync with the CPU/GPU
 void renderFrame(Renderer *renderer, unsigned int srcWidth,
                  unsigned int srcHeight, vFrame *videoFrame) {
 
@@ -71,12 +84,48 @@ void renderFrame(Renderer *renderer, unsigned int srcWidth,
 
   // frameYUV->data uses RGB not YUV from the frames
   glBindTexture(GL_TEXTURE_2D, renderer->texture);
+
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, srcWidth, srcHeight, GL_RGB,
                   GL_UNSIGNED_BYTE, videoFrame->frameYUV->data[0]);
 
   useShader(&renderer->shader);
   glBindVertexArray(renderer->vao);
   glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+}
+// renders a texture-frame in async with the CPU/GPU
+void renderFrameWithPBO(Renderer *renderer, unsigned int srcWidth,
+                        unsigned int srcHeight, vFrame *videoFrame) {
+
+  int nextPboIndex = (renderer->pboIndex + 1) % 2; // Change between PBO 0 and 1
+
+  // Bind the pbo with data (Cpu fills data)
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, renderer->pbo[nextPboIndex]);
+  glBufferData(GL_PIXEL_UNPACK_BUFFER, srcWidth * srcHeight * 3, NULL,
+               GL_STREAM_DRAW); // reserve data
+  void *ptr =
+      glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY); // access to buffer
+  if (ptr) {
+    memcpy(ptr, videoFrame->frameYUV->data[0],
+           srcWidth * srcHeight * 3); // copy data
+    glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
+  }
+  // Bind the old PBO for uploading data to the GPU
+  glBindTexture(GL_TEXTURE_2D, renderer->texture);
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, renderer->pbo[renderer->pboIndex]);
+
+  startTimerQuery(renderer);
+  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, srcWidth, srcHeight, GL_RGB,
+                  GL_UNSIGNED_BYTE, 0);
+
+  endTimerQuery(renderer);
+  // unbind and render Frames
+  glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+  useShader(&renderer->shader);
+  glBindVertexArray(renderer->vao);
+  glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+  // switch PBO'S to use.
+  renderer->pboIndex = nextPboIndex;
 }
 
 void updateVideoTranformation(Renderer *renderer, int windowWidth,
@@ -118,7 +167,22 @@ void updateVideoTranformation(Renderer *renderer, int windowWidth,
 }
 
 void cleanupRenderer(Renderer *renderer) {
+  glDeleteQueries(1, &renderer->queryID);
   glDeleteVertexArrays(1, &renderer->vao);
   glDeleteBuffers(1, &renderer->vbo);
+  glDeleteBuffers(1, &renderer->ebo);
   glDeleteTextures(1, &renderer->texture);
+}
+
+void startTimerQuery(Renderer *renderer) {
+  glBeginQuery(GL_TIME_ELAPSED, renderer->queryID);
+}
+
+void endTimerQuery(Renderer *renderer) {
+  glEndQuery(GL_TIME_ELAPSED);
+
+  GLuint64 timeElapsed = 0;
+  glGetQueryObjectui64v(renderer->queryID, GL_QUERY_RESULT, &timeElapsed);
+
+  printf("Frame Render Time: %f ms\n", timeElapsed / 1e6);
 }
