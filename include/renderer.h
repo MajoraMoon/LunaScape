@@ -31,6 +31,10 @@ void initRenderer(Renderer *renderer, int texWidth, int texHeight);
 void renderFrame(Renderer *renderer, unsigned int srcWidth,
                  unsigned int srcHeight, vFrame *videoFrame);
 
+void updateVideoTranformation(Renderer *renderer, int windowWidth,
+                              int windowHeight, int videoWidth,
+                              int videoHeight);
+
 // Destroy data from OpenGL
 void cleanupRenderer(Renderer *renderer);
 

@@ -1,7 +1,8 @@
 #include <main.h>
 
-#define VIDEO_FILE "../video3.mp4"
+#define VIDEO_FILE "../video.mp4"
 
+// window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
 
@@ -10,22 +11,24 @@ int main(int argc, char *argv[]) {
   VideoContainer *video = init_video_container(VIDEO_FILE);
   if (!video) {
     SDL_Log("Failed to init video\n");
+
     return -1;
   }
 
   vFrame *videoFrame = init_video_frames(video);
   if (!videoFrame) {
     SDL_Log("Failed to init videoFrames");
+
     return -1;
   }
 
   // init SDL3 window with OpenGL context.
   SDL_Window *window =
-      initWayWindowGL("LunaCore", "0.1", video->pCodecCtx->width,
-                      video->pCodecCtx->height, true);
+      initWayWindowGL("LunaScape", "0.1", SCR_WIDTH, SCR_HEIGHT, true);
 
   if (window == NULL) {
     SDL_Log("Something went wrong in setting up a SDL window.\n");
+
     return -1;
   }
 
@@ -33,6 +36,7 @@ int main(int argc, char *argv[]) {
 
   if (!glContext) {
     SDL_Log("Something went wrong in setting up a glContext.\n");
+
     return -1;
   }
 
@@ -40,7 +44,8 @@ int main(int argc, char *argv[]) {
   initRenderer(&renderer, video->pCodecCtx->width, video->pCodecCtx->height);
 
   bool running = true;
-  uint32_t start_time = SDL_GetTicks();
+  uint64_t start_time = SDL_GetTicksNS();
+
   // main render loop
   while (running) {
     SDL_Event event;
@@ -57,24 +62,34 @@ int main(int argc, char *argv[]) {
         }
       }
     }
+
+    // responsible for holding the aspect ratio of the video right
+    int windowWidth, windowHeight;
+    SDL_GetWindowSize(window, &windowWidth, &windowHeight);
+    updateVideoTranformation(&renderer, windowWidth, windowHeight,
+                             video->pCodecCtx->width, video->pCodecCtx->height);
+
+    // Sync the render loops framerate with the one from the given Video
     if (video_container_get_frame(video, videoFrame)) {
-      // Timing (optional): Warte, wenn der Videotimestamp größer ist als die
-      // verstrichene Zeit
       int64_t pts = videoFrame->frame->pts;
       double timestamp =
           pts *
           av_q2d(
               video->pFormatCtx->streams[video->videoStreamIndex]->time_base);
-      double current_time_sec = (SDL_GetTicks() - start_time) / 1000.0;
-      if (timestamp > current_time_sec) {
-        SDL_Delay((uint32_t)((timestamp - current_time_sec) * 1000));
+
+      double current_time_sec = (double)(SDL_GetTicksNS() - start_time) / 1e9;
+      double wait_time = timestamp - current_time_sec;
+
+      if (wait_time >
+          0.001) { // Only delays when the time difference is bigger than 1ms
+        SDL_Delay((uint32_t)(wait_time * 1000));
       }
 
       // Render mit OpenGL:
       renderFrame(&renderer, video->pCodecCtx->width, video->pCodecCtx->height,
                   videoFrame);
     } else {
-      // Video zu Ende – Loop wieder von Anfang
+      // When no frames avaiable anymore, start the video from the beginning
       av_seek_frame(video->pFormatCtx, video->videoStreamIndex, 0,
                     AVSEEK_FLAG_BACKWARD);
       avcodec_flush_buffers(video->pCodecCtx);

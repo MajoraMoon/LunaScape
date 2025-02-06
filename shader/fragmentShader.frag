@@ -1,10 +1,10 @@
 #version 410 core
-in vec2 TexCoord;   // Von Vertex Shader übergebene Texturkoordinaten
-out vec4 FragColor; // Endgültige Fragmentfarbe
+in vec2 TexCoord;   // from vertex shader given coordinates
+out vec4 FragColor; // frament colors
 
-uniform sampler2D videoTexture; // Unser Video-Textur-Sampler
+uniform sampler2D videoTexture; // video texture sampler
 
 void main() {
-  // Lese die Farbe aus der Textur und gib sie aus.
+  // reads the color from the texture and outputs it
   FragColor = texture(videoTexture, TexCoord);
 }
