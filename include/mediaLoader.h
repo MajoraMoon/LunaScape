@@ -20,6 +20,7 @@
 
 #include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
+#include <libavutil/hwcontext.h>
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 
@@ -91,10 +92,13 @@ typedef struct VideoContainer {
 
   AVFormatContext *pFormatCtx;
   AVCodecContext *pCodecCtx;
+  AVBufferRef *hw_device_ctx;
+
   const AVCodec *pCodec;
   int videoStreamIndex;
   bool paused;
   struct SwsContext *sws_ctx;
+  struct SwsContext *hw_sws_ctx; // sws codec for Hardware-Decoding
 
 } VideoContainer;
 
@@ -113,7 +117,10 @@ typedef struct vFrame {
   uint8_t *imgBuffer;
 } vFrame;
 
-VideoContainer *init_video_container(const char *filepath);
+enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
+                                 const enum AVPixelFormat *pix_fmts);
+
+VideoContainer *init_video_container(const char *filepath, bool force_software);
 
 void free_video_data(VideoContainer *video);
 

@@ -1,6 +1,6 @@
 #include <main.h>
 
-#define VIDEO_FILE "../test2.mkv"
+#define VIDEO_FILE "../video.mp4"
 
 // window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
@@ -8,7 +8,7 @@ const unsigned int SCR_HEIGHT = 1080;
 
 int main(int argc, char *argv[]) {
 
-  VideoContainer *video = init_video_container(VIDEO_FILE);
+  VideoContainer *video = init_video_container(VIDEO_FILE, false);
   if (!video) {
     SDL_Log("Failed to init video\n");
 
@@ -51,9 +51,6 @@ int main(int argc, char *argv[]) {
   // press "F" for activating Fullscreen
   bool isFullscreen = false;
 
-  // press "Space" for pausing the video
-  video->paused = false;
-
   // main render loop
   while (running) {
     SDL_Event event;
@@ -65,7 +62,15 @@ int main(int argc, char *argv[]) {
 
       // Key Press down
       if (event.type == SDL_EVENT_KEY_DOWN) {
-        if (event.key.key == SDLK_ESCAPE) {
+
+        // If in fullscreen mode and pressed escape key, leave fullscreen mode.
+        // when not in fullscreenmode and pressed escape key, close application.
+        if (isFullscreen && event.key.key == SDLK_ESCAPE) {
+
+          SDL_SetWindowFullscreen(window, false);
+          isFullscreen = !isFullscreen;
+
+        } else if (event.key.key == SDLK_ESCAPE) {
           running = false;
         }
 
@@ -97,9 +102,10 @@ int main(int argc, char *argv[]) {
     updateVideoTranformation(&renderer, windowWidth, windowHeight,
                              video->pCodecCtx->width, video->pCodecCtx->height);
 
-    // Sync the render loops framerate with the one from the given Video
-
+    // when video is paused, then the current frame will be rendered with less
+    // ressources used.
     if (!video->paused) {
+      // Sync the render loops framerate with the one from the given Video
       if (video_container_get_frame(video, videoFrame)) {
         int64_t pts = videoFrame->frame->pts;
         double timestamp =
@@ -125,6 +131,8 @@ int main(int argc, char *argv[]) {
                       AVSEEK_FLAG_BACKWARD);
         avcodec_flush_buffers(video->pCodecCtx);
       }
+
+      // rendering without any other performance boost stuff lol
     } else {
 
       renderFrameWithoutUpdate(&renderer);
