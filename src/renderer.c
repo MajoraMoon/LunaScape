@@ -113,11 +113,9 @@ void renderFrameWithPBO(Renderer *renderer, unsigned int srcWidth,
   glBindTexture(GL_TEXTURE_2D, renderer->texture);
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, renderer->pbo[renderer->pboIndex]);
 
-  startTimerQuery(renderer);
   glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, srcWidth, srcHeight, GL_RGB,
                   GL_UNSIGNED_BYTE, 0);
 
-  endTimerQuery(renderer);
   // unbind and render Frames
   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
   useShader(&renderer->shader);
