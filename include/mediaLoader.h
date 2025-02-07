@@ -24,6 +24,10 @@
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 
+#include <libavutil/channel_layout.h> // Audio: channellayouts
+#include <libavutil/samplefmt.h>      // Audio: Sample-Formats
+#include <libswresample/swresample.h> // Audio: Resampling
+
 /**
  * General information:
  *
@@ -117,6 +121,26 @@ typedef struct vFrame {
   uint8_t *imgBuffer;
 } vFrame;
 
+// Same structs for audio decoding
+
+typedef struct AudioContainer {
+  AVFormatContext *pFormatCtx;
+  AVCodecContext *pCodecCtx;
+
+  const AVCodec *pCodec;
+  int audioStreamIndex;
+  bool paused;
+  struct SwrContext *swr_ctx;
+} AudioContainer;
+
+typedef struct aFrame {
+  AVFrame *frame;
+  AVPacket *packet;
+  uint8_t **convertedData;
+  int convertedDataSize;
+} aFrame;
+
+// VIDEO DECODING FUNCTIONS
 enum AVPixelFormat get_hw_format(AVCodecContext *ctx,
                                  const enum AVPixelFormat *pix_fmts);
 
@@ -129,5 +153,13 @@ vFrame *init_video_frames(VideoContainer *video);
 void free_video_frames(vFrame *videoFrame);
 
 int video_container_get_frame(VideoContainer *video, vFrame *videoFrame);
+
+// AUDIO DECODING FUNCTIONS
+
+AudioContainer *init_audio_container(const char *filepath);
+void free_audio_data(AudioContainer *audio);
+aFrame *init_audio_frames(AudioContainer *audio);
+void free_audio_frames(aFrame *audioFrame);
+int audio_container_get_frame(AudioContainer *audio, aFrame *audioFrame);
 
 #endif

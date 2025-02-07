@@ -22,14 +22,34 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  free(video_file);
-
   vFrame *videoFrame = init_video_frames(video);
   if (!videoFrame) {
     SDL_Log("Failed to init videoFrames");
 
     return -1;
   }
+
+  AudioContainer *audio = init_audio_container(video_file);
+  if (!audio) {
+    SDL_Log("Failed to init audio");
+    free(video_file);
+
+    return -1;
+  }
+
+  free(video_file);
+
+  aFrame *audioFrame = init_audio_frames(audio);
+  if (!audioFrame) {
+    SDL_Log("Failed to init audio frames");
+    free_audio_data(audio);
+
+    return -1;
+  }
+
+  SDL_AudioSpec desiredSpec;
+  SDL_zero(desiredSpec);
+  desiredSpec.freq = audio->pCodecCtx->sample_rate;
 
   // init SDL3 window with OpenGL context.
   SDL_Window *window =

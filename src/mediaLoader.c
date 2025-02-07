@@ -1,5 +1,11 @@
 #include "mediaLoader.h"
 
+/**
+ *
+ *  VIDEO CONTAINER DECODING START
+ *
+ */
+
 // hardware decoding format when detected
 static enum AVPixelFormat hw_pix_fmt = AV_PIX_FMT_NONE;
 
@@ -278,3 +284,210 @@ void free_video_frames(vFrame *videoFrame) {
   av_free(videoFrame->imgBuffer);
   free(videoFrame);
 }
+
+/**
+ *
+ *  VIDEO CONTAINER DECODING END
+ *
+ */
+
+/**
+ *
+ *  AUDIO CONTAINER DECODING START
+ *
+ */
+
+AudioContainer *init_audio_container(const char *filepath) {
+  AudioContainer *audio = malloc(sizeof(AudioContainer));
+  if (!audio) {
+    printf("AudioContainer - Memory allocation error.\n");
+    return NULL;
+  }
+
+  audio->pFormatCtx = NULL;
+  audio->pCodecCtx = NULL;
+  audio->audioStreamIndex = -1;
+  audio->swr_ctx = NULL;
+  audio->paused = false;
+
+  if (avformat_open_input(&audio->pFormatCtx, filepath, NULL, NULL) != 0) {
+    printf("Could not open Audiofile.\n");
+    free(audio);
+    return NULL;
+  }
+
+  if (avformat_find_stream_info(audio->pFormatCtx, NULL) < 0) {
+    printf("Could not find any stream-information.\n");
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+
+  for (int i = 0; i < audio->pFormatCtx->nb_streams; i++) {
+    if (audio->pFormatCtx->streams[i]->codecpar->codec_type ==
+        AVMEDIA_TYPE_AUDIO) {
+      audio->audioStreamIndex = i;
+      break;
+    }
+  }
+
+  if (audio->audioStreamIndex == -1) {
+    printf("No audio-stream found.\n");
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+
+  audio->pCodec = avcodec_find_decoder(
+      audio->pFormatCtx->streams[audio->audioStreamIndex]->codecpar->codec_id);
+  if (!audio->pCodec) {
+    printf("Unsupported audio codec.\n");
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+
+  audio->pCodecCtx = avcodec_alloc_context3(audio->pCodec);
+  avcodec_parameters_to_context(
+      audio->pCodecCtx,
+      audio->pFormatCtx->streams[audio->audioStreamIndex]->codecpar);
+
+  if (avcodec_open2(audio->pCodecCtx, audio->pCodec, NULL) < 0) {
+    printf("Could not open audio codec.\n");
+    avcodec_free_context(&audio->pCodecCtx);
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+
+  // Erzeuge aus der alten Kanalmaskenangabe jeweils ein AVChannelLayout
+  AVChannelLayout out_ch_layout, in_ch_layout;
+  int ret = av_channel_layout_from_mask(&out_ch_layout, AV_CH_LAYOUT_STEREO);
+  if (ret < 0) {
+    printf("Could not set output channel layout.\n");
+    avcodec_free_context(&audio->pCodecCtx);
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+  ret = av_channel_layout_from_mask(&in_ch_layout,
+                                    audio->pCodecCtx->ch_layout.u.mask);
+  if (ret < 0) {
+    printf("Could not set input channel layout.\n");
+    avcodec_free_context(&audio->pCodecCtx);
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+
+  // Verwende swr_alloc_set_opts2() – der erste Parameter ist &audio->swr_ctx!
+  ret = swr_alloc_set_opts2(
+      &audio->swr_ctx,
+      &out_ch_layout,    // Ausgabe: Kanal-Layout (als AVChannelLayout*)
+      AV_SAMPLE_FMT_FLT, // Ausgabe: Sample-Format (Fließkommazahlen)
+      audio->pCodecCtx->sample_rate, // Ausgabe: Sample-Rate
+      &in_ch_layout, // Eingabe: Kanal-Layout (als AVChannelLayout*)
+      audio->pCodecCtx->sample_fmt,  // Eingabe: Sample-Format
+      audio->pCodecCtx->sample_rate, // Eingabe: Sample-Rate
+      0, NULL);
+  if (ret < 0 || !audio->swr_ctx) {
+    printf("Could not allocate resampler context.\n");
+    if (audio->swr_ctx)
+      swr_free(&audio->swr_ctx);
+    avcodec_free_context(&audio->pCodecCtx);
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+  ret = swr_init(audio->swr_ctx);
+  if (ret < 0) {
+    printf("Could not initialize resampler context.\n");
+    swr_free(&audio->swr_ctx);
+    avcodec_free_context(&audio->pCodecCtx);
+    avformat_close_input(&audio->pFormatCtx);
+    free(audio);
+    return NULL;
+  }
+
+  return audio;
+}
+
+aFrame *init_audio_frames(AudioContainer *audio) {
+
+  aFrame *audioFrame = (aFrame *)malloc(sizeof(aFrame));
+  if (!audioFrame) {
+    printf("AudioFrame - Memory allocation error.\n");
+    return NULL;
+  }
+
+  audioFrame->frame = av_frame_alloc();
+  audioFrame->packet = av_packet_alloc();
+  audioFrame->convertedData = NULL;
+  audioFrame->convertedDataSize = 0;
+
+  return audioFrame;
+}
+
+int audio_container_get_frame(AudioContainer *audio, aFrame *audioFrame) {
+  while (audio->paused) {
+    SDL_Delay(10);
+  }
+
+  while (av_read_frame(audio->pFormatCtx, audioFrame->packet) >= 0) {
+    if (audioFrame->packet->stream_index == audio->audioStreamIndex) {
+      if (avcodec_send_packet(audio->pCodecCtx, audioFrame->packet) < 0) {
+        av_packet_unref(audioFrame->packet);
+        continue;
+      }
+
+      while (avcodec_receive_frame(audio->pCodecCtx, audioFrame->frame) == 0) {
+        int dst_nb_samples = av_rescale_rnd(
+            swr_get_delay(audio->swr_ctx, audio->pCodecCtx->sample_rate) +
+                audioFrame->frame->nb_samples,
+            audio->pCodecCtx->sample_rate, audio->pCodecCtx->sample_rate,
+            AV_ROUND_UP);
+
+        av_samples_alloc(audioFrame->convertedData, NULL, 2, dst_nb_samples,
+                         AV_SAMPLE_FMT_FLT, 0);
+        int len = swr_convert(audio->swr_ctx, audioFrame->convertedData,
+                              dst_nb_samples,
+                              (const uint8_t **)audioFrame->frame->data,
+                              audioFrame->frame->nb_samples);
+
+        audioFrame->convertedDataSize =
+            av_samples_get_buffer_size(NULL, 2, len, AV_SAMPLE_FMT_FLT, 0);
+
+        av_packet_unref(audioFrame->packet);
+        return 1;
+      }
+    }
+    av_packet_unref(audioFrame->packet);
+  }
+  return 0;
+}
+
+void free_audio_data(AudioContainer *audio) {
+  if (!audio)
+    return;
+
+  swr_free(&audio->swr_ctx);
+  avcodec_free_context(&audio->pCodecCtx);
+  avformat_close_input(&audio->pFormatCtx);
+  free(audio);
+}
+
+void free_audio_frames(aFrame *audioFrame) {
+  if (!audioFrame)
+    return;
+
+  av_frame_free(&audioFrame->frame);
+  av_packet_free(&audioFrame->packet);
+  av_free(audioFrame->convertedData);
+  free(audioFrame);
+}
+
+/**
+ *
+ *  AUDIO CONTAINER DECODING END
+ *
+ */
