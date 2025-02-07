@@ -1,14 +1,30 @@
-SDL3 - ffmpeg - nevermind -openGL. 
+# SDL3 - ffmpeg - nevermind - openGL
 
-Dependencies that need to be installed: ffmpeg, SDL3.
-SDL3 still has some problems, see CmakeList.txt. It needs to be directly linked for some GPU API functions to work for some reason.
+## Dependencies
 
-On Wayland/Plasma 6
+Dependencies that need to be installed:
+- **ffmpeg**
+- **SDL3**
 
-Frame Render time measured with "glBeginQuery":
+SDL3 still has some problems, see `CMakeLists.txt`. It needs to be directly linked for some GPU API functions to work for some reason.
 
-only with "glTexSubImage2D" :  ~5ms
+## On Wayland/Plasma 6
 
-with a Pixel Buffer Object:    ~2ms
+Frame render time measured with `glBeginQuery`:
 
-with two Pixel Buffer Objects: ~0.5ms
+| Method                               | Render Time |
+|--------------------------------------|------------|
+| only with `glTexSubImage2D`         | ~5ms       |
+| with a Pixel Buffer Object          | ~2ms       |
+| with two Pixel Buffer Objects       | ~0.5ms     |
+
+## Keys
+
+| Key      | Action                                      |
+|----------|---------------------------------------------|
+| R        | Load another video                         |
+| Space    | Pause video                                |
+| F        | Enter Fullscreen mode / Leave Fullscreen mode |
+| Escape (Fullscreen) | Leave Fullscreen mode          |
+| Escape (Windowed)   | Close Program                  |
+

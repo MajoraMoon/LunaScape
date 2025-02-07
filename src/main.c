@@ -1,77 +1,28 @@
-#include <linux/limits.h>
 #include <main.h>
-
-#define VIDEO_FILE "../video.mp4"
 
 // window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
 
-char *get_project_root() {
-  static char path[PATH_MAX];
-  if (realpath("..", path)) {
-    return path;
-  }
-  return NULL;
-}
-
-char *select_video_file(void) {
-  char buffer[1024] = {0};
-  char command[1200];
-
-  char *project_root = get_project_root();
-  if (!project_root) {
-    SDL_Log("Could not define project root.");
-    return NULL;
-  }
-
-  snprintf(command, sizeof(command),
-           "kdialog --getopenfilename \"%s\" \"Videos (*.mp4 *.mkv *.avi *.mov "
-           "*.webm *.flv)\"",
-           project_root);
-
-  FILE *fp = popen(command, "r");
-  if (!fp) {
-    SDL_Log("Error: popen() failed.");
-    return NULL;
-  }
-
-  if (!fgets(buffer, sizeof(buffer), fp)) {
-    SDL_Log("Error: No file selected.");
-    pclose(fp);
-    return NULL;
-  }
-  pclose(fp);
-
-  buffer[strcspn(buffer, "\n")] = '\0';
-
-  if (strlen(buffer) == 0) {
-    SDL_Log("Error: No supported files selected.");
-    return NULL;
-  }
-
-  char *filename = malloc(strlen(buffer) + 1);
-  if (filename)
-    strcpy(filename, buffer);
-
-  return filename;
-}
-
 int main(int argc, char *argv[]) {
 
-  char *video_file = select_video_file();
+  char *video_file = KDE_Plasma_select_video_file();
   if (!video_file || video_file[0] == '\0') {
     SDL_Log("No videofile selected. Closing programm.");
+    if (video_file) {
+      free(video_file);
+    }
     return -1;
   }
-  SDL_Log("Selected Videofile: %s", video_file);
 
   VideoContainer *video = init_video_container(video_file, false);
   if (!video) {
     SDL_Log("Failed to init video\n");
-
+    free(video_file);
     return -1;
   }
+
+  free(video_file);
 
   vFrame *videoFrame = init_video_frames(video);
   if (!videoFrame) {
@@ -151,6 +102,41 @@ int main(int argc, char *argv[]) {
             video->paused = false;
           }
         }
+
+        if (event.key.key == SDLK_R) {
+          // if not paused, before reloading pause video so the it's not
+          // decoding in the background
+          if (!video->paused) {
+            pauseStart = SDL_GetTicksNS();
+            video->paused = true;
+            SDL_Delay(10);
+          }
+
+          // saving old dimensions, for a possible new renderer.
+          int oldWidth = video->pCodecCtx->width;
+          int oldHeight = video->pCodecCtx->height;
+
+          if (!reload_video(&video, &videoFrame, &start_time)) {
+            // if the video selection was cancelled, unpause video
+            uint64_t pauseDuration = SDL_GetTicksNS() - pauseStart;
+            start_time += pauseDuration;
+            video->paused = false;
+          }
+
+          // if the dimensions of the old video are not the same as the
+          // dimensions of the new video, the texures in the renderer need to be
+          // updated to these dimensions too
+          if (video && (video->pCodecCtx->width != oldWidth ||
+                        video->pCodecCtx->height != oldHeight)) {
+            SDL_Log("Video resolution changed: old: %dx%d, new: %dx%d. "
+                    "Reinitializing renderer...",
+                    oldWidth, oldHeight, video->pCodecCtx->width,
+                    video->pCodecCtx->height);
+            cleanupRenderer(&renderer);
+            initRenderer(&renderer, video->pCodecCtx->width,
+                         video->pCodecCtx->height);
+          }
+        }
       }
     }
 
@@ -161,10 +147,13 @@ int main(int argc, char *argv[]) {
                              video->pCodecCtx->width, video->pCodecCtx->height);
 
     // when video is paused, then the current frame will be rendered with less
-    // ressources used.
+    // ressources used. When not paused, it uses two always alternating buffers
+    // pixel buffer objects.
     if (!video->paused) {
-      // Sync the render loops framerate with the one from the given Video
+
       if (video_container_get_frame(video, videoFrame)) {
+        // Sync the render loops framerate with the one from the given Video.
+        // Doing magic basically.
         int64_t pts = videoFrame->frame->pts;
         double timestamp =
             pts *
@@ -179,8 +168,6 @@ int main(int argc, char *argv[]) {
           SDL_Delay((uint32_t)(wait_time * 1000));
         }
 
-        // On my sytem, the frame render time is going down from 5ms to 2ms when
-        // using pixel buffer objects.
         renderFrameWithPBO(&renderer, video->pCodecCtx->width,
                            video->pCodecCtx->height, videoFrame);
       } else {
@@ -190,7 +177,6 @@ int main(int argc, char *argv[]) {
         avcodec_flush_buffers(video->pCodecCtx);
       }
 
-      // rendering without any other performance boost stuff lol
     } else {
 
       renderFrameWithoutUpdate(&renderer);

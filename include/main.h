@@ -16,6 +16,7 @@
 #include "wayWindowGL.h"
 #include "shader.h"
 #include "renderer.h"
+#include "mediaPicker.h"
 
 
 #endif
