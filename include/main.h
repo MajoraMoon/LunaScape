@@ -5,8 +5,13 @@
 #include <glad/glad.h>
 #include <SDL3/SDL.h>
 
-#include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <limits.h>
+#include <string.h>
+
+
 
 #include "wayWindowGL.h"
 #include "shader.h"

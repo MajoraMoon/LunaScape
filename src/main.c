@@ -1,3 +1,4 @@
+#include <linux/limits.h>
 #include <main.h>
 
 #define VIDEO_FILE "../video.mp4"
@@ -6,9 +7,66 @@
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
 
+char *get_project_root() {
+  static char path[PATH_MAX];
+  if (realpath("..", path)) {
+    return path;
+  }
+  return NULL;
+}
+
+char *select_video_file(void) {
+  char buffer[1024] = {0};
+  char command[1200];
+
+  char *project_root = get_project_root();
+  if (!project_root) {
+    SDL_Log("Could not define project root.");
+    return NULL;
+  }
+
+  snprintf(command, sizeof(command),
+           "kdialog --getopenfilename \"%s\" \"Videos (*.mp4 *.mkv *.avi *.mov "
+           "*.webm *.flv)\"",
+           project_root);
+
+  FILE *fp = popen(command, "r");
+  if (!fp) {
+    SDL_Log("Error: popen() failed.");
+    return NULL;
+  }
+
+  if (!fgets(buffer, sizeof(buffer), fp)) {
+    SDL_Log("Error: No file selected.");
+    pclose(fp);
+    return NULL;
+  }
+  pclose(fp);
+
+  buffer[strcspn(buffer, "\n")] = '\0';
+
+  if (strlen(buffer) == 0) {
+    SDL_Log("Error: No supported files selected.");
+    return NULL;
+  }
+
+  char *filename = malloc(strlen(buffer) + 1);
+  if (filename)
+    strcpy(filename, buffer);
+
+  return filename;
+}
+
 int main(int argc, char *argv[]) {
 
-  VideoContainer *video = init_video_container(VIDEO_FILE, false);
+  char *video_file = select_video_file();
+  if (!video_file || video_file[0] == '\0') {
+    SDL_Log("No videofile selected. Closing programm.");
+    return -1;
+  }
+  SDL_Log("Selected Videofile: %s", video_file);
+
+  VideoContainer *video = init_video_container(video_file, false);
   if (!video) {
     SDL_Log("Failed to init video\n");
 
