@@ -1,49 +1,34 @@
 #include "audioManager.h"
 
-int alsa_pcm_init(snd_pcm_t **pcm_handle, unsigned int sample_rate,
-                  int channels) {
+int portaudio_init(PaStream **stream, unsigned int sample_rate, int channels,
+                   PaStreamCallback *callback, void *userData) {
 
-  int err;
+  PaError paErr = Pa_Initialize();
 
-  err = snd_pcm_open(pcm_handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
-  if (err < 0) {
-    fprintf(stderr, "Something went wrong with opening the PCM-Device: %s\n",
-            snd_strerror(err));
+  if (paErr != paNoError) {
+    fprintf(stderr, "PortAudio initialization error: %s\n",
+            Pa_GetErrorText(paErr));
 
-    return err;
+    return -1;
   }
 
-  snd_pcm_hw_params_t *params;
-  snd_pcm_hw_params_malloc(&params);
-  snd_pcm_hw_params_any(*pcm_handle, params);
+  paErr =
+      Pa_OpenDefaultStream(stream, 0, channels, paFloat32, sample_rate,
+                           paFramesPerBufferUnspecified, callback, userData);
 
-  // Interleaved Access-mode
-  snd_pcm_hw_params_set_access(*pcm_handle, params,
-                               SND_PCM_ACCESS_RW_INTERLEAVED);
-
-  snd_pcm_hw_params_set_format(*pcm_handle, params, SND_PCM_FORMAT_FLOAT_LE);
-
-  // Count of channels (stereo)
-  snd_pcm_hw_params_set_channels(*pcm_handle, params, channels);
-
-  // sample-rate
-  unsigned int rate = sample_rate;
-  snd_pcm_hw_params_set_rate_near(*pcm_handle, params, &rate, 0);
-
-  snd_pcm_uframes_t frames = 1024;
-  snd_pcm_hw_params_set_period_size_near(*pcm_handle, params, &frames, 0);
-
-  err = snd_pcm_hw_params(*pcm_handle, params);
-  if (err < 0) {
-    fprintf(
-        stderr,
-        "Something went wrong with setting up the hardware-parameters: %s\n",
-        snd_strerror(err));
-    snd_pcm_hw_params_free(params);
-
-    return err;
+  if (paErr != paNoError) {
+    fprintf(stderr, "PortAudio open stream error: %s\n",
+            Pa_GetErrorText(paErr));
+    Pa_Terminate();
+    return -1;
   }
-  snd_pcm_hw_params_free(params);
-
+  paErr = Pa_StartStream(*stream);
+  if (paErr != paNoError) {
+    fprintf(stderr, "PortAudio start stream error: %s\n",
+            Pa_GetErrorText(paErr));
+    Pa_CloseStream(*stream);
+    Pa_Terminate();
+    return -1;
+  }
   return 0;
 }

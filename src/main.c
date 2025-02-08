@@ -1,9 +1,66 @@
-#include <alsa/asoundlib.h>
 #include <main.h>
 
 // window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
+
+volatile double audio_clock = 0.0;
+
+typedef struct AudioThreadData {
+  AudioContainer *audio;
+  aFrame *audioFrame;
+  int channels;
+  volatile bool running;
+  unsigned int sample_rate;
+  volatile double *audio_clock_ptr;
+} AudioThreadData;
+
+static int paCallback(const void *inputBuffer, void *outputBuffer,
+                      unsigned long framesPerBuffer,
+                      const PaStreamCallbackTimeInfo *timeInfo,
+                      PaStreamCallbackFlags statusFlags, void *userData) {
+  (void)inputBuffer; // Verhindert Warnungen über ungenutzte Variablen.
+  (void)timeInfo;
+  (void)statusFlags;
+
+  AudioThreadData *atd = (AudioThreadData *)userData;
+  float *out = (float *)outputBuffer;
+  unsigned long framesCopied = 0;
+
+  // Lautstärke-Faktor (z. B. 0.5 für 50% der Originallautstärke)
+  const float volume = 0.5f;
+
+  while (framesCopied < framesPerBuffer) {
+    if (audio_container_get_frame(atd->audio, atd->audioFrame)) {
+      int framesAvailable =
+          atd->audioFrame->convertedDataSize / (sizeof(float) * atd->channels);
+      int framesToCopy = (framesAvailable < (framesPerBuffer - framesCopied))
+                             ? framesAvailable
+                             : (framesPerBuffer - framesCopied);
+
+      // Kopiere und skaliere die Samples zeilenweise:
+      for (int i = 0; i < framesToCopy * atd->channels; i++) {
+        // Multipliziere jeden Sample mit dem Lautstärke-Faktor
+        out[framesCopied * atd->channels + i] =
+            atd->audioFrame->convertedData[0][i] * volume;
+      }
+      framesCopied += framesToCopy;
+      // Falls dein Frame noch extra Samples enthält, könntest du diese hier
+      // zwischenspeichern.
+    } else {
+      // Falls kein Frame verfügbar, fülle den Rest mit Stille.
+      for (unsigned long i = framesCopied; i < framesPerBuffer; i++) {
+        for (int ch = 0; ch < atd->channels; ch++) {
+          out[i * atd->channels + ch] = 0.0f;
+        }
+      }
+      framesCopied = framesPerBuffer;
+    }
+  }
+  // Aktualisiere die Audio-Uhr (in Sekunden)
+  *(atd->audio_clock_ptr) += ((double)framesCopied / atd->sample_rate);
+  return paContinue;
+}
 
 int main(int argc, char *argv[]) {
 
@@ -72,12 +129,22 @@ int main(int argc, char *argv[]) {
   Renderer renderer;
   initRenderer(&renderer, video->pCodecCtx->width, video->pCodecCtx->height);
 
-  // init ALSSA-PCM
-  snd_pcm_t *pcm_handle;
+  // --- PortAudio Initialization ---
   unsigned int sample_rate = audio->pCodecCtx->sample_rate;
   int channels = 2; // stereo
-  if (alsa_pcm_init(&pcm_handle, sample_rate, channels) < 0) {
-    SDL_Log("Could not initialize ALSA-PCM.");
+
+  AudioThreadData atd;
+  atd.audio = audio;
+  atd.audioFrame = audioFrame;
+  atd.channels = channels;
+  atd.running = true;
+  atd.sample_rate = sample_rate;
+  atd.audio_clock_ptr = &audio_clock;
+
+  PaStream *paStream;
+  // Instead of using ALSA, we initialize PortAudio via our helper function.
+  if (portaudio_init(&paStream, sample_rate, channels, paCallback, &atd) < 0) {
+    SDL_Log("Failed to initialize PortAudio.");
     cleanupRenderer(&renderer);
     cleanupWindow(window, glContext);
     free_video_frames(videoFrame);
@@ -87,6 +154,7 @@ int main(int argc, char *argv[]) {
     SDL_Quit();
     return -1;
   }
+  // --- End PortAudio Initialization ---
 
   bool running = true;
 
@@ -221,26 +289,16 @@ int main(int argc, char *argv[]) {
     }
 
     SDL_GL_SwapWindow(window);
-
-    // audio test
-    if (audio_container_get_frame(audio, audioFrame)) {
-
-      int frames_to_write =
-          audioFrame->convertedDataSize / (sizeof(float) * channels);
-      int err = snd_pcm_writei(pcm_handle, audioFrame->convertedData[0],
-                               frames_to_write);
-      if (err < 0) {
-        fprintf(stderr, "Could not write audio data: %s\n", snd_strerror(err));
-        err = snd_pcm_recover(pcm_handle, err, 0);
-        if (err < 0) {
-          fprintf(stderr, "Could not recover audio: %s\n", snd_strerror(err));
-        }
-      }
-    }
   }
 
-  snd_pcm_drain(pcm_handle);
-  snd_pcm_close(pcm_handle);
+  // --- PortAudio Cleanup ---
+  PaError paErr = Pa_StopStream(paStream);
+  if (paErr != paNoError) {
+    SDL_Log("PortAudio stop stream error: %s", Pa_GetErrorText(paErr));
+  }
+  Pa_CloseStream(paStream);
+  Pa_Terminate();
+  // --- End PortAudio Cleanup ---
   free_video_frames(videoFrame);
   free_video_data(video);
   cleanupRenderer(&renderer);

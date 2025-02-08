@@ -17,7 +17,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(/usr/local/include/SDL3_image)
 include_directories(${CMAKE_SOURCE_DIR}/lib/glad/include)
 
-target_link_libraries(LunaScape PRIVATE asound)
+
 
 
 # When I'm using "SDL3::SDL3" for target_link_libraries, 
@@ -36,3 +36,9 @@ target_include_directories(LunaScape PRIVATE ${FFMPEG_INCLUDE_DIRS})
 target_link_libraries(LunaScape PRIVATE ${FFMPEG_LIBRARIES})
 
 target_compile_options(LunaScape PRIVATE ${FFMPEG_CFLAGS_OTHER})
+
+
+pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
+target_include_directories(LunaScape PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+target_link_libraries(LunaScape PRIVATE ${PORTAUDIO_LIBRARIES})
+target_compile_options(LunaScape PRIVATE ${PORTAUDIO_CFLAGS_OTHER})
