@@ -1,5 +1,6 @@
 #include <main.h>
 
+// test commit
 // window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
