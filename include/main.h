@@ -17,6 +17,7 @@
 #include "shader.h"
 #include "renderer.h"
 #include "mediaPicker.h"
+#include "audioManager.h"
 
 
 #endif

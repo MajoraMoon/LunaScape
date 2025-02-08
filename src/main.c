@@ -29,28 +29,6 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
-  AudioContainer *audio = init_audio_container(video_file);
-  if (!audio) {
-    SDL_Log("Failed to init audio");
-    free(video_file);
-
-    return -1;
-  }
-
-  free(video_file);
-
-  aFrame *audioFrame = init_audio_frames(audio);
-  if (!audioFrame) {
-    SDL_Log("Failed to init audio frames");
-    free_audio_data(audio);
-
-    return -1;
-  }
-
-  SDL_AudioSpec desiredSpec;
-  SDL_zero(desiredSpec);
-  desiredSpec.freq = audio->pCodecCtx->sample_rate;
-
   // init SDL3 window with OpenGL context.
   SDL_Window *window =
       initWayWindowGL("LunaScape", "0.1", SCR_WIDTH, SCR_HEIGHT, true);
@@ -69,6 +47,14 @@ int main(int argc, char *argv[]) {
     return -1;
   }
 
+  AudioManager audioManager;
+  if (audio_manager_init(&audioManager, video_file) < 0) {
+    SDL_Log("Failed to initialize audio manager");
+    free(video_file);
+    return -1;
+  }
+  free(video_file);
+
   Renderer renderer;
   initRenderer(&renderer, video->pCodecCtx->width, video->pCodecCtx->height);
 
@@ -79,6 +65,8 @@ int main(int argc, char *argv[]) {
 
   // press "F" for activating Fullscreen
   bool isFullscreen = false;
+
+  audio_manager_start(&audioManager);
 
   // main render loop
   while (running) {
@@ -207,6 +195,8 @@ int main(int argc, char *argv[]) {
     SDL_GL_SwapWindow(window);
   }
 
+  audio_manager_stop(&audioManager);
+  audio_manager_cleanup(&audioManager);
   free_video_frames(videoFrame);
   free_video_data(video);
   cleanupRenderer(&renderer);
