@@ -11,10 +11,12 @@
 
 
 #include "mediaLoader.h"
+#include "audioManager.h"
 
 
 char *KDE_Plasma_select_video_file(void);
 
-bool reload_video(VideoContainer **video, vFrame **videoFrame, uint64_t *start_time);
+bool reload_video_and_audio(VideoContainer **video, vFrame **videoFrame,
+    AudioManager *audioManager, uint64_t *start_time);
 
 #endif

@@ -13,6 +13,7 @@ static int audio_thread_func(void *data) {
         if (ret < 0) {
           SDL_Log("SDL_PutAudioStreamData error: %s", SDL_GetError());
         }
+
       } else {
         // No more audio frames available.
         am->running = false;
@@ -55,7 +56,7 @@ int audio_manager_init(AudioManager *am, const char *filepath) {
   }
   SDL_ResumeAudioStreamDevice(am->audioStream);
 
-  am->buffer_threshold = 16384; // This threshold worked well for you.
+  am->buffer_threshold = 16384; // This threshold worked well
   am->running = false;
   am->audioThread = NULL;
   return 0;

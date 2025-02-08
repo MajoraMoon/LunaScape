@@ -62,8 +62,8 @@ char *KDE_Plasma_select_video_file(void) {
  * Returns false when either no file was selected or the video/videoFrame setup
  * failed.
  */
-bool reload_video(VideoContainer **video, vFrame **videoFrame,
-                  uint64_t *start_time) {
+bool reload_video_and_audio(VideoContainer **video, vFrame **videoFrame,
+                            AudioManager *audioManager, uint64_t *start_time) {
 
   // Select new file first
   char *new_video_file = KDE_Plasma_select_video_file();
@@ -73,6 +73,15 @@ bool reload_video(VideoContainer **video, vFrame **videoFrame,
       free(new_video_file);
     }
 
+    return false;
+  }
+
+  audio_manager_stop(audioManager);
+  audio_manager_cleanup(audioManager);
+
+  if (audio_manager_init(audioManager, new_video_file) < 0) {
+    SDL_Log("Failed to initialize audio manager");
+    free(new_video_file);
     return false;
   }
 
@@ -108,6 +117,8 @@ bool reload_video(VideoContainer **video, vFrame **videoFrame,
   *start_time = SDL_GetTicksNS();
 
   free(new_video_file);
+
+  audio_manager_start(audioManager);
 
   return true;
 }

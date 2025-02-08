@@ -9,6 +9,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_SOURCE_DIR}/bin)
 
 file(GLOB_RECURSE SOURCES "src/*.c")
 
+
 set(GLAD_SRC ${CMAKE_SOURCE_DIR}/lib/glad/src/glad.c)
 
 add_executable(LunaScape ${SOURCES} ${GLAD_SRC})

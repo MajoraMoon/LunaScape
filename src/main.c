@@ -1,6 +1,5 @@
 #include <main.h>
 
-// test commit
 // window size when executing the program
 const unsigned int SCR_WIDTH = 1920;
 const unsigned int SCR_HEIGHT = 1080;
@@ -61,14 +60,13 @@ int main(int argc, char *argv[]) {
 
   bool running = true;
 
-  uint64_t start_time = SDL_GetTicksNS();
   uint64_t pauseStart = 0;
 
   // press "F" for activating Fullscreen
   bool isFullscreen = false;
 
   audio_manager_start(&audioManager);
-
+  uint64_t start_time = SDL_GetTicksNS();
   // main render loop
   while (running) {
     SDL_Event event;
@@ -105,10 +103,13 @@ int main(int argc, char *argv[]) {
           if (!video->paused) {
             pauseStart = SDL_GetTicksNS();
             video->paused = true;
+            SDL_PauseAudioStreamDevice(audioManager.audioStream);
+
           } else {
             uint64_t pauseDuration = SDL_GetTicksNS() - pauseStart;
             start_time += pauseDuration;
             video->paused = false;
+            SDL_ResumeAudioStreamDevice(audioManager.audioStream);
           }
         }
 
@@ -118,6 +119,7 @@ int main(int argc, char *argv[]) {
           if (!video->paused) {
             pauseStart = SDL_GetTicksNS();
             video->paused = true;
+            SDL_PauseAudioStreamDevice(audioManager.audioStream);
             SDL_Delay(10);
           }
 
@@ -125,7 +127,8 @@ int main(int argc, char *argv[]) {
           int oldWidth = video->pCodecCtx->width;
           int oldHeight = video->pCodecCtx->height;
 
-          if (!reload_video(&video, &videoFrame, &start_time)) {
+          if (!reload_video_and_audio(&video, &videoFrame, &audioManager,
+                                      &start_time)) {
             // if the video selection was cancelled, unpause video
             uint64_t pauseDuration = SDL_GetTicksNS() - pauseStart;
             start_time += pauseDuration;
@@ -184,6 +187,11 @@ int main(int argc, char *argv[]) {
         av_seek_frame(video->pFormatCtx, video->videoStreamIndex, 0,
                       AVSEEK_FLAG_BACKWARD);
         avcodec_flush_buffers(video->pCodecCtx);
+
+        av_seek_frame(audioManager.audio->pFormatCtx,
+                      audioManager.audio->audioStreamIndex, 0,
+                      AVSEEK_FLAG_BACKWARD);
+        avcodec_flush_buffers(audioManager.audio->pCodecCtx);
       }
 
     } else {
