@@ -3,6 +3,7 @@
 
 #include "mediaLoader.h" // Contains definitions for AudioContainer, aFrame, etc.
 #include <SDL3/SDL.h>
+#include <alsa/asoundlib.h>
 
 typedef struct AudioManager {
   AudioContainer *audio;        // FFmpeg audio container.
@@ -13,16 +14,7 @@ typedef struct AudioManager {
   int buffer_threshold;         // Threshold in bytes (e.g., 16384).
 } AudioManager;
 
-// Initializes the audio manager from a file path.
-int audio_manager_init(AudioManager *am, const char *filepath);
-
-// Starts the audio processing thread.
-void audio_manager_start(AudioManager *am);
-
-// Stops the audio processing thread.
-void audio_manager_stop(AudioManager *am);
-
-// Cleans up all audio-related resources.
-void audio_manager_cleanup(AudioManager *am);
+int alsa_pcm_init(snd_pcm_t **pcm_handle, unsigned int sample_rate,
+                  int channels);
 
 #endif // AUDIO_MANAGER_H

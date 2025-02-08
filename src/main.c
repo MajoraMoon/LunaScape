@@ -1,3 +1,4 @@
+#include <alsa/asoundlib.h>
 #include <main.h>
 
 // window size when executing the program
@@ -25,9 +26,25 @@ int main(int argc, char *argv[]) {
   vFrame *videoFrame = init_video_frames(video);
   if (!videoFrame) {
     SDL_Log("Failed to init videoFrames");
-
     return -1;
   }
+
+  AudioContainer *audio = init_audio_container(video_file);
+  if (!audio) {
+    SDL_Log("Fehler beim Initialisieren des Audios.");
+    free(video_file);
+    SDL_Quit();
+    return -1;
+  }
+
+  aFrame *audioFrame = init_audio_frames(audio);
+  if (!audioFrame) {
+    SDL_Log("Fehler beim Initialisieren der AudioFrames.");
+    free_audio_data(audio);
+    SDL_Quit();
+    return -1;
+  }
+  free(video_file);
 
   // init SDL3 window with OpenGL context.
   SDL_Window *window =
@@ -35,7 +52,6 @@ int main(int argc, char *argv[]) {
 
   if (window == NULL) {
     SDL_Log("Something went wrong in setting up a SDL window.\n");
-
     return -1;
   }
 
@@ -43,20 +59,34 @@ int main(int argc, char *argv[]) {
 
   if (!glContext) {
     SDL_Log("Something went wrong in setting up a glContext.\n");
-
     return -1;
   }
-
-  AudioManager audioManager;
-  if (audio_manager_init(&audioManager, video_file) < 0) {
-    SDL_Log("Failed to initialize audio manager");
-    free(video_file);
-    return -1;
-  }
-  free(video_file);
+  /*
+    AudioManager audioManager;
+    if (audio_manager_init(&audioManager, video_file) < 0) {
+      SDL_Log("Failed to initialize audio manager");
+      free(video_file);
+      return -1;
+    } */
 
   Renderer renderer;
   initRenderer(&renderer, video->pCodecCtx->width, video->pCodecCtx->height);
+
+  // init ALSSA-PCM
+  snd_pcm_t *pcm_handle;
+  unsigned int sample_rate = audio->pCodecCtx->sample_rate;
+  int channels = 2; // stereo
+  if (alsa_pcm_init(&pcm_handle, sample_rate, channels) < 0) {
+    SDL_Log("Could not initialize ALSA-PCM.");
+    cleanupRenderer(&renderer);
+    cleanupWindow(window, glContext);
+    free_video_frames(videoFrame);
+    free_video_data(video);
+    free_audio_frames(audioFrame);
+    free_audio_data(audio);
+    SDL_Quit();
+    return -1;
+  }
 
   bool running = true;
 
@@ -65,8 +95,6 @@ int main(int argc, char *argv[]) {
 
   // press "F" for activating Fullscreen
   bool isFullscreen = false;
-
-  audio_manager_start(&audioManager);
 
   // main render loop
   while (running) {
@@ -80,8 +108,9 @@ int main(int argc, char *argv[]) {
       // Key Press down
       if (event.type == SDL_EVENT_KEY_DOWN) {
 
-        // If in fullscreen mode and pressed escape key, leave fullscreen mode.
-        // when not in fullscreenmode and pressed escape key, close application.
+        // If in fullscreen mode and pressed escape key, leave fullscreen
+        // mode. when not in fullscreenmode and pressed escape key, close
+        // application.
         if (isFullscreen && event.key.key == SDLK_ESCAPE) {
 
           SDL_SetWindowFullscreen(window, false);
@@ -155,8 +184,8 @@ int main(int argc, char *argv[]) {
                              video->pCodecCtx->width, video->pCodecCtx->height);
 
     // when video is paused, then the current frame will be rendered with less
-    // ressources used. When not paused, it uses two always alternating buffers
-    // pixel buffer objects.
+    // ressources used. When not paused, it uses two always alternating
+    // buffers pixel buffer objects.
     if (!video->paused) {
 
       if (video_container_get_frame(video, videoFrame)) {
@@ -171,8 +200,8 @@ int main(int argc, char *argv[]) {
         double current_time_sec = (double)(SDL_GetTicksNS() - start_time) / 1e9;
         double wait_time = timestamp - current_time_sec;
 
-        if (wait_time >
-            0.001) { // Only delays when the time difference is bigger than 1ms
+        if (wait_time > 0.001) { // Only delays when the time difference is
+                                 // bigger than 1ms
           SDL_Delay((uint32_t)(wait_time * 1000));
         }
 
@@ -188,19 +217,37 @@ int main(int argc, char *argv[]) {
     } else {
 
       renderFrameWithoutUpdate(&renderer);
-
       SDL_Delay(200);
     }
 
     SDL_GL_SwapWindow(window);
+
+    // audio test
+    if (audio_container_get_frame(audio, audioFrame)) {
+
+      int frames_to_write =
+          audioFrame->convertedDataSize / (sizeof(float) * channels);
+      int err = snd_pcm_writei(pcm_handle, audioFrame->convertedData[0],
+                               frames_to_write);
+      if (err < 0) {
+        fprintf(stderr, "Could not write audio data: %s\n", snd_strerror(err));
+        err = snd_pcm_recover(pcm_handle, err, 0);
+        if (err < 0) {
+          fprintf(stderr, "Could not recover audio: %s\n", snd_strerror(err));
+        }
+      }
+    }
   }
 
-  audio_manager_stop(&audioManager);
-  audio_manager_cleanup(&audioManager);
+  snd_pcm_drain(pcm_handle);
+  snd_pcm_close(pcm_handle);
   free_video_frames(videoFrame);
   free_video_data(video);
   cleanupRenderer(&renderer);
   cleanupWindow(window, glContext);
+  free_audio_frames(audioFrame);
+  free_audio_data(audio);
 
+  SDL_Quit();
   return 0;
 }
