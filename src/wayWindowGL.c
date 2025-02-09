@@ -35,6 +35,8 @@ SDL_Window *initWayWindowGL(const char *title, const char *version,
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_FULLSCREEN_BOOLEAN,
                          false);
+  SDL_SetBooleanProperty(
+      props, SDL_PROP_WINDOW_CREATE_WAYLAND_SURFACE_ROLE_CUSTOM_BOOLEAN, true);
 
   SDL_Window *window = SDL_CreateWindowWithProperties(props);
 

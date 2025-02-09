@@ -1,25 +1,15 @@
 
 #include <mediaPicker.h>
 
-// relativ path to absolute path. Goes on path above the one, where the
-// programm
-// was executed.
-static char *get_project_root() {
-  static char path[PATH_MAX];
-  if (realpath("..", path)) {
-    return path;
-  }
-  return NULL;
-}
-
 // implementation on KDE Plasma , might add more later
 char *KDE_Plasma_select_video_file(void) {
   char buffer[1024] = {0};
   char command[1200];
 
-  char *project_root = get_project_root();
-  if (!project_root) {
-    SDL_Log("Could not define project root.");
+  char *home_path = getenv("HOME");
+  if (!home_path) {
+    SDL_Log("Could not get the home directory.");
+
     return NULL;
   }
 
@@ -27,7 +17,7 @@ char *KDE_Plasma_select_video_file(void) {
   snprintf(command, sizeof(command),
            "kdialog --getopenfilename \"%s\" \"Videos (*.mp4 *.mkv *.avi *.mov "
            "*.webm *.flv)\"",
-           project_root);
+           home_path);
 
   // opens the shell with the command above
   FILE *fp = popen(command, "r");
