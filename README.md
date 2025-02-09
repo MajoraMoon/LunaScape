@@ -1,7 +1,7 @@
 
 
 # LunaScape – Simple Video Player with SDL3, FFmpeg, and OpenGL
-(A KDE Plasma-optimized video player using `kdialog` for file selection)
+(An extremly simple KDE Plasma video player using `kdialog` for file selection)
 
 ## Dependencies
 
@@ -11,7 +11,7 @@ To build and run LunaScape, you need the following dependencies installed:
 - **[SDL3](https://github.com/libsdl-org/SDL)**
 
 
-## ⚙️ SDL3 Dependency
+## SDL3 Dependency
 
 > ⚠ **Important:**  
 > Direct linking is required for SDL3 because using `SDL3::SDL3` in `target_link_libraries`  
@@ -41,7 +41,7 @@ target_link_libraries(LunaScape PRIVATE
 
 ---
 
-## 📊 Performance Benchmarks
+## Performance Benchmarks
 
 > **Frame render time** measured with `glBeginQuery`:
 
@@ -53,5 +53,4 @@ target_link_libraries(LunaScape PRIVATE
 
 ---
 
-💡 **Note:** This project is optimized for Plasma (Wayland).  
-It utilizes `kdialog` for file selection.
+**Note:** It utilizes `kdialog` for file selection.
