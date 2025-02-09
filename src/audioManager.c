@@ -1,4 +1,5 @@
 #include "audioManager.h"
+#include <stdlib.h>
 
 // This is the audio thread function that continuously feeds audio data.
 static int audio_thread_func(void *data) {
@@ -7,13 +8,26 @@ static int audio_thread_func(void *data) {
     int available = SDL_GetAudioStreamAvailable(am->audioStream);
     if (available < am->buffer_threshold) {
       if (audio_container_get_frame(am->audio, am->audioFrame)) {
-        int ret = SDL_PutAudioStreamData(am->audioStream,
-                                         am->audioFrame->convertedData[0],
-                                         am->audioFrame->convertedDataSize);
+        int ret;
+        if (am->muted) {
+          // Allocate a temporary buffer filled with silence (0.0f for
+          // SDL_AUDIO_F32).
+          void *silence = calloc(1, am->audioFrame->convertedDataSize);
+          if (!silence) {
+            SDL_Log("Memory allocation for silence buffer failed.");
+            continue;
+          }
+          ret = SDL_PutAudioStreamData(am->audioStream, silence,
+                                       am->audioFrame->convertedDataSize);
+          free(silence);
+        } else {
+          ret = SDL_PutAudioStreamData(am->audioStream,
+                                       am->audioFrame->convertedData[0],
+                                       am->audioFrame->convertedDataSize);
+        }
         if (ret < 0) {
           SDL_Log("SDL_PutAudioStreamData error: %s", SDL_GetError());
         }
-
       } else {
         // No more audio frames available.
         am->running = false;
@@ -59,6 +73,8 @@ int audio_manager_init(AudioManager *am, const char *filepath) {
   am->buffer_threshold = 16384; // This threshold worked well
   am->running = false;
   am->audioThread = NULL;
+  am->muted = false; // Initialer Zustand: nicht stumm.
+
   return 0;
 }
 
@@ -80,7 +96,6 @@ void audio_manager_stop(AudioManager *am) {
 }
 
 void audio_manager_cleanup(AudioManager *am) {
-
   if (am->audioFrame) {
     free_audio_frames(am->audioFrame);
   }

@@ -11,6 +11,7 @@ typedef struct AudioManager {
   SDL_Thread *audioThread;      // Audio thread pointer.
   volatile bool running;        // Flag to control the audio thread.
   int buffer_threshold;         // Threshold in bytes (e.g., 16384).
+  bool muted;
 } AudioManager;
 
 // Initializes the audio manager from a file path.

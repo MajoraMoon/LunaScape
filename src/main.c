@@ -133,6 +133,7 @@ int main(int argc, char *argv[]) {
             uint64_t pauseDuration = SDL_GetTicksNS() - pauseStart;
             start_time += pauseDuration;
             video->paused = false;
+            SDL_ResumeAudioStreamDevice(audioManager.audioStream);
           }
 
           // if the dimensions of the old video are not the same as the
@@ -148,6 +149,10 @@ int main(int argc, char *argv[]) {
             initRenderer(&renderer, video->pCodecCtx->width,
                          video->pCodecCtx->height);
           }
+        }
+
+        if (event.key.key == SDLK_M) {
+          audioManager.muted = !audioManager.muted;
         }
       }
     }
@@ -173,11 +178,19 @@ int main(int argc, char *argv[]) {
                 video->pFormatCtx->streams[video->videoStreamIndex]->time_base);
 
         double current_time_sec = (double)(SDL_GetTicksNS() - start_time) / 1e9;
+        double audio_time_sec =
+            (double)(SDL_GetAudioStreamQueued(audioManager.audioStream)) /
+            (audioManager.audio->pCodecCtx->sample_rate *
+             audioManager.audio->pCodecCtx->ch_layout.nb_channels *
+             av_get_bytes_per_sample(
+                 audioManager.audio->pCodecCtx->sample_fmt));
+
         double wait_time = timestamp - current_time_sec;
 
-        if (wait_time >
-            0.001) { // Only delays when the time difference is bigger than 1ms
+        if (wait_time > 0.005) { // 5ms Toleranz
           SDL_Delay((uint32_t)(wait_time * 1000));
+        } else if (audio_time_sec > timestamp) {
+          SDL_Delay((uint32_t)((audio_time_sec - timestamp) * 1000 / 2));
         }
 
         renderFrameWithPBO(&renderer, video->pCodecCtx->width,
