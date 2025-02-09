@@ -1,30 +1,57 @@
-# SDL3 - ffmpeg - nevermind - openGL
+
+
+# LunaScape – Simple Video Player with SDL3, FFmpeg, and OpenGL
+(A KDE Plasma-optimized video player using `kdialog` for file selection)
 
 ## Dependencies
 
-Dependencies that need to be installed:
-- **ffmpeg**
-- **SDL3**
+To build and run LunaScape, you need the following dependencies installed:
 
-SDL3 still has some problems, see `CMakeLists.txt`. It needs to be directly linked for some GPU API functions to work for some reason.
+- **[FFmpeg](https://ffmpeg.org/)**
+- **[SDL3](https://github.com/libsdl-org/SDL)**
 
-## On Wayland/Plasma 6
 
-Frame render time measured with `glBeginQuery`:
+## ⚙️ SDL3 Dependency
 
-| Method                               | Render Time |
-|--------------------------------------|------------|
-| only with `glTexSubImage2D`         | ~5ms       |
-| with a Pixel Buffer Object          | ~2ms       |
-| with two Pixel Buffer Objects       | ~0.5ms     |
+> ⚠ **Important:**  
+> Direct linking is required for SDL3 because using `SDL3::SDL3` in `target_link_libraries`  
+> results in undefined references for GPU API functions (e.g., `SDL_WaitAndAcquireGPUSwapchainTexture`).  
+> Therefore, we manually link the libraries as shown below:
 
-## Keys
+```cmake
+find_package(SDL3 REQUIRED)
+target_link_libraries(LunaScape PRIVATE 
+    "/usr/lib/libSDL3.so"
+    "/usr/local/lib/libSDL3_image.so"
+)
+```
+
+---
+
+##  Controls
 
 | Key      | Action                                      |
 |----------|---------------------------------------------|
-| R        | Load another video                         |
-| Space    | Pause video                                |
-| F        | Enter Fullscreen mode / Leave Fullscreen mode |
-| Escape (Fullscreen) | Leave Fullscreen mode          |
-| Escape (Windowed)   | Close Program                  |
+| `R`      | Load another video                         |
+| `Space`  | Pause video                                |
+| `F`      | Toggle Fullscreen mode                     |
+| `Esc` (Fullscreen) | Exit Fullscreen mode             |
+| `Esc` (Windowed)   | Close the program                |
+| `M`      | Mute Audio                                 |
 
+---
+
+## 📊 Performance Benchmarks
+
+> **Frame render time** measured with `glBeginQuery`:
+
+| Method                               | Render Time |
+|--------------------------------------|------------|
+| Only `glTexSubImage2D`               | ~5ms       |
+| Using a Pixel Buffer Object (PBO)    | ~2ms       |
+| Using two Pixel Buffer Objects (PBO) | ~0.5ms     |
+
+---
+
+💡 **Note:** This project is optimized for Plasma (Wayland).  
+It utilizes `kdialog` for file selection.
