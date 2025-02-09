@@ -5,8 +5,6 @@
 // clang-format off
 #include <glad/glad.h>
 #include <SDL3/SDL.h>
-#include <wayland-client-core.h>
-#include 
 
 
 #include <stdbool.h>
